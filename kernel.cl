@@ -108,22 +108,18 @@ __kernel void evolve(__global vec_t* pos_a,
 			pos_b[i] = p;
 			vel_b[i] = v;
 		} else {
-			vec_t p_ = pos_a[jParticle];
-			vec_t v_ = vel_a[jParticle];
-
-			p  += min2intersect * v;
-			p_ += min2intersect * v_;
-
-			vec_t omega = normalize(p - p_);
-
-			while (dot(omega,omega) < 1.0) {
-				omega *= 1.001;
-			}
-
-			v  -= dot(vel_a[i] - vel_a[jParticle], omega) * omega;
-			v_ -= dot(vel_a[jParticle] - vel_a[i], omega) * omega;
-
 			if (i < jParticle) {
+				vec_t p_ = pos_a[jParticle];
+				vec_t v_ = vel_a[jParticle];
+
+				p  += min2intersect * v;
+				p_ += min2intersect * v_;
+
+				vec_t omega = normalize(p - p_);
+
+				v  -= dot(vel_a[i] - vel_a[jParticle], omega) * omega;
+				v_ -= dot(vel_a[jParticle] - vel_a[i], omega) * omega;
+
 				p  += (DELTA_T - min2intersect) * v;
 				p_ += (DELTA_T - min2intersect) * v_;
 

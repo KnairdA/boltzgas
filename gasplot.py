@@ -12,7 +12,12 @@ grid_width = 30
 radius = 0.002
 char_u = 1120
 
-config = HardSphereSetup(radius, char_u, *grid_of_random_velocity_particles(grid_width, radius, char_u))
+position, velocity = grid_of_random_velocity_particles(grid_width, radius, char_u)
+velocity[:,:] = 0
+velocity[0,0] = 10.75*char_u
+velocity[0,1] = -.25*char_u
+config = HardSphereSetup(radius, char_u, position, velocity)
+#config = HardSphereSetup(radius, char_u, *grid_of_random_velocity_particles(grid_width, radius, char_u))
 gas = GasFlow(config)
 
 m_nitrogen = 0.028 / const.N_A
@@ -21,7 +26,7 @@ def plot(step, velocities):
     velocities = np.array([np.linalg.norm(v) for v in velocities])
     maxwellian = stats.maxwell.fit(velocities)
 
-    print("T = %.0f K; u_mean = %.0f [m/s]; energy = %.05f" % ((maxwellian[1]**2 / const.k * m_nitrogen, stats.maxwell.mean(*maxwellian), np.sum([x*2 for x in velocities]))))
+    print("T = %.0f K; u_mean = %.0f [m/s]; energy = %.05f" % ((maxwellian[1]**2 / const.k * m_nitrogen, stats.maxwell.mean(*maxwellian), np.sum([x**2 for x in velocities]))))
 
     plt.figure()
 
@@ -52,4 +57,4 @@ def simulate(n_steps, section):
 
         plot(i, velocities)
 
-simulate(10000, 500)
+simulate(100000, 1000)

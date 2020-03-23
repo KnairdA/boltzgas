@@ -8,157 +8,177 @@ import numpy as np
 
 from particles import GasFlow, HardSphereSetup, grid_of_random_velocity_particles
 
-def on_timer(t):
-    glutTimerFunc(t, on_timer, t)
-    glutPostRedisplay()
-
-def get_projection(width, height):
-    world_height = 1.0
-    world_width = world_height / height * width
-    pixels_per_unit = height / world_height
-
-    projection  = matrix44.create_orthogonal_projection(-world_width/2, world_width/2, -world_height/2, world_height/2, -1, 1)
-    translation = matrix44.create_from_translation([-1.0/2, -1.0/2, 0])
-
-    return (np.matmul(translation, projection), pixels_per_unit)
-
-def on_reshape(width, height):
-    global projection, pixels_per_unit
-    glViewport(0,0,width,height)
-    projection, pixels_per_unit = get_projection(width, height)
-
 glutInit()
 glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
 glutInitWindowPosition(0, 0)
 window = glutCreateWindow("gas")
-glutTimerFunc(10, on_timer, 10)
 
-fragment_shader = shaders.compileShader("""
-#version 430
+class Shader:
+    def __init__(self, vertex_src, fragment_src, uniform):
+        self.program = shaders.compileProgram(
+            shaders.compileShader(vertex_src, GL_VERTEX_SHADER),
+            shaders.compileShader(fragment_src, GL_FRAGMENT_SHADER))
+        self.uniform = { }
+        for name in uniform:
+            self.uniform[name] = shaders.glGetUniformLocation(self.program, name)
 
-in vec3 color;
+    def use(self):
+        shaders.glUseProgram(self.program)
 
-void main(){
-    if (length(gl_PointCoord - vec2(0.5)) > 0.5) {
-        discard;
-    }
+particle_shader = Shader(
+    fragment_src = """
+        #version 430
 
-    gl_FragColor = vec4(color.xyz, 0.0);
-}""", GL_FRAGMENT_SHADER)
+        in vec3 color;
 
-particle_shader = shaders.compileShader("""
-#version 430
+        void main(){
+            if (length(gl_PointCoord - vec2(0.5)) > 0.5) {
+                discard;
+            }
 
-layout (location=0) in vec2 particles;
+            gl_FragColor = vec4(color.xyz, 0.0);
+        }""",
+    vertex_src = """
+        #version 430
 
-out vec3 color;
+        layout (location=0) in vec2 particles;
 
-uniform mat4 projection;
+        out vec3 color;
 
-void main() {
-    gl_Position = projection * vec4(particles, 0., 1.);
-    color = vec3(0.0);
-}""", GL_VERTEX_SHADER)
+        uniform mat4 projection;
 
-particle_program = shaders.compileProgram(particle_shader, fragment_shader)
+        void main() {
+            gl_Position = projection * vec4(particles, 0., 1.);
+            color = vec3(0.0);
+        }""",
+    uniform = ['projection']
+)
 
-background_fragment_shader = shaders.compileShader("""
-#version 430
+decoration_shader = Shader(
+    fragment_src = """
+        #version 430
 
-in vec3 color;
+        in vec3 color;
 
-void main(){
-    gl_FragColor = vec4(color.xyz, 0.0);
-}""", GL_FRAGMENT_SHADER)
+        void main(){
+            gl_FragColor = vec4(color.xyz, 0.0);
+        }""",
+    vertex_src = """
+        #version 430
 
-background_vertex_shader = shaders.compileShader("""
-#version 430
+        in vec3 vertex;
 
-in vec3 vertex;
+        out vec3 color;
 
-out vec3 color;
+        uniform mat4 projection;
+        uniform vec3 face_color;
 
-uniform mat4 projection;
-uniform vec3 face_color;
-
-void main() {
-    gl_Position = projection * vec4(vertex, 1.);
-    color = face_color;
-}""", GL_VERTEX_SHADER)
-background_program = shaders.compileProgram(background_vertex_shader, background_fragment_shader)
-
-particle_projection_id   = shaders.glGetUniformLocation(particle_program, 'projection')
-background_projection_id = shaders.glGetUniformLocation(background_program, 'projection')
-background_color_id = shaders.glGetUniformLocation(background_program, 'face_color')
+        void main() {
+            gl_Position = projection * vec4(vertex, 1.);
+            color = face_color;
+        }""",
+    uniform = ['projection', 'face_color']
+)
 
 class View:
-    def __init__(self, gas):
+    def __init__(self, gas, decorations):
         self.gas = gas
-        self.energy = 0
-        self.tracer = [ ]
+        self.decorations = decorations
 
-    def update_trace(self):
-        positions = self.gas.get_positions()
-        self.tracer.append((positions[5][0],positions[5][1]))
-        if len(self.tracer) > 100:
-            self.tracer.pop(0)
+    def reshape(self, width, height):
+        glViewport(0,0,width,height)
 
-    def draw_trace(self):
-        glUniform3f(background_color_id, 1., 0., 0.)
-        glLineWidth(2)
-        glBegin(GL_LINE_STRIP)
-        for v in self.tracer:
-            glVertex(*v, 0.)
-        glEnd()
+        world_height = 1.0
+        world_width = world_height / height * width
 
-    def on_display(self):
-        for i in range(0,10):
-            self.gas.evolve()
+        projection  = matrix44.create_orthogonal_projection(-world_width/2, world_width/2, -world_height/2, world_height/2, -1, 1)
+        translation = matrix44.create_from_translation([-1.0/2, -1.0/2, 0])
 
+        self.pixels_per_unit = height / world_height
+        self.projection = np.matmul(translation, projection)
+
+    def display(self):
         glClearColor(0.4,0.4,0.4,1.)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        shaders.glUseProgram(background_program)
-        glUniformMatrix4fv(background_projection_id, 1, False, np.asfortranarray(projection))
-        glUniform3f(background_color_id, 1., 1., 1.)
-        glBegin(GL_TRIANGLE_STRIP)
-        glVertex(0.,0.,0.)
-        glVertex(1.,0.,0.)
-        glVertex(0.,1.,0.)
-        glVertex(1.,1.,0.)
-        glEnd()
+        decoration_shader.use()
+        glUniformMatrix4fv(decoration_shader.uniform['projection'], 1, False, np.asfortranarray(self.projection))
+        for decoration in self.decorations:
+            decoration.display(decoration_shader.uniform)
 
-        if trace:
-            self.draw_trace()
-
-        shaders.glUseProgram(particle_program)
-        glUniformMatrix4fv(particle_projection_id, 1, False, np.asfortranarray(projection))
+        particle_shader.use()
+        glUniformMatrix4fv(particle_shader.uniform['projection'], 1, False, np.asfortranarray(self.projection))
         glEnable(GL_POINT_SPRITE)
-        glPointSize(2*radius*pixels_per_unit)
-        gas.gl_draw_particles()
+        glPointSize(2*radius*self.pixels_per_unit)
+        self.gas.gl_draw_particles()
 
         glutSwapBuffers()
 
-        if trace:
-            self.update_trace()
+class Tracer:
+    def __init__(self, gas, iParticle):
+        self.gas = gas
+        self.iParticle = iParticle
+        self.trace = [ ]
 
-        velocities = gas.get_velocities()
-        energy = np.sum(np.array([np.linalg.norm(v)**2 for v in velocities]))
-        if abs(energy - self.energy) > 1e-4:
-            print("energy = %.05f" % energy)
-            self.energy = energy
+    def update(self):
+        position = self.gas.get_positions()[self.iParticle]
+        self.trace.append((position[0], position[1]))
 
-grid_width = 10
-radius = 0.005
-char_u = 1
-trace = True
+    def display(self, uniform):
+        glUniform3f(uniform['face_color'], 1., 0., 0.)
+        glLineWidth(2)
+        glBegin(GL_LINE_STRIP)
+        for v in self.trace:
+            glVertex(*v, 0.)
+        glEnd()
 
-config = HardSphereSetup(radius, char_u, *grid_of_random_velocity_particles(grid_width, radius, char_u))
-gas = GasFlow(config, opengl = True)
+class ColoredBox:
+    def __init__(self, origin, extend, color):
+        self.origin = origin
+        self.extend = extend
+        self.color = color
 
-view = View(gas)
+    def display(self, uniform):
+        glUniform3f(uniform['face_color'], *self.color)
+        glBegin(GL_TRIANGLE_STRIP)
+        glVertex(self.origin[0],                  self.origin[1]                 , 0.)
+        glVertex(self.origin[0] + self.extend[0], self.origin[1]                 , 0.)
+        glVertex(self.origin[0]                 , self.origin[1] + self.extend[1], 0.)
+        glVertex(self.origin[0] + self.extend[1], self.origin[1] + self.extend[1], 0.)
+        glEnd()
 
-glutDisplayFunc(view.on_display)
+grid_width = 30
+radius = 0.002
+char_u = 1120
+
+position, velocity = grid_of_random_velocity_particles(grid_width, radius, char_u)
+velocity[:,:] = 0
+velocity[0,0] = 10*char_u
+velocity[0,1] =  1*char_u
+
+config = HardSphereSetup(radius, char_u, position, velocity)
+gas = GasFlow(config, opengl = True, t_scale = 1.0)
+
+tracer = Tracer(gas, 5)
+view = View(gas, [ColoredBox([0,0], [1,1], (1,1,1)), tracer])
+
+def on_display():
+    for i in range(0,10):
+        gas.evolve()
+
+    tracer.update()
+
+    view.display()
+
+def on_reshape(width, height):
+    view.reshape(width, height)
+
+def on_timer(t):
+    glutTimerFunc(t, on_timer, t)
+    glutPostRedisplay()
+
+glutDisplayFunc(on_display)
 glutReshapeFunc(on_reshape)
+glutTimerFunc(10, on_timer, 10)
 
 glutMainLoop()
