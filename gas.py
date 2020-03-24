@@ -254,7 +254,6 @@ class VelocityHistogram:
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4*np.dtype(np.float32).itemsize, ctypes.c_void_p(2*np.dtype(np.float32).itemsize))
 
         self.texture_id = glGenTextures(2)
-        print(self.texture_id)
 
         glBindTexture(GL_TEXTURE_2D, self.texture_id[0])
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -267,7 +266,7 @@ class VelocityHistogram:
     def update(self):
         self.steps = self.steps + 1
 
-        if self.steps % 100 == 0 and self.plotter == None:
+        if self.steps % 50 == 0 and self.plotter == None:
             self.plotter = self.pool.submit(get_histogram, self.gas.get_velocity_norms())
 
         else:
@@ -319,10 +318,10 @@ histogram = VelocityHistogram(gas, [1.1,0], [1,1])
 histogram.setup()
 view = View(gas, [ ColoredBox([0,0], [1,1], (1,1,1)), tracer ], [ histogram ])
 
-running = False
+active = False
 
 def on_display():
-    if running:
+    if active:
         for i in range(0,5):
             gas.evolve()
 
@@ -339,16 +338,17 @@ def on_timer(t):
     glutPostRedisplay()
 
 def on_keyboard(key, x, y):
-    global running
-    running = not running
+    global active
+    active = not active
 
 def on_close():
-    histogram.pool.shutdown(wait=True)
+    histogram.pool.shutdown()
 
-glutDisplayFunc(on_display)
-glutReshapeFunc(on_reshape)
-glutTimerFunc(10, on_timer, 10)
-glutKeyboardFunc(on_keyboard)
-glutCloseFunc(on_close)
+if __name__ == "__main__":
+    glutDisplayFunc(on_display)
+    glutReshapeFunc(on_reshape)
+    glutTimerFunc(10, on_timer, 10)
+    glutKeyboardFunc(on_keyboard)
+    glutCloseFunc(on_close)
 
-glutMainLoop()
+    glutMainLoop()

@@ -23,7 +23,6 @@ pkgs.stdenvNoCC.mkDerivation rec {
 
     local-python = custom-python.withPackages (python-packages: with python-packages; [
       numpy
-      sympy
       scipy
       pyopencl setuptools
       pyopengl pyrr
