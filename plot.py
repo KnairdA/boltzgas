@@ -6,7 +6,8 @@ from scipy.optimize import minimize
 import matplotlib
 import matplotlib.pyplot as plt
 
-from particles import GasFlow, HardSphereSetup, grid_of_random_velocity_particles
+from boltzgas import HardSphereSetup, HardSphereSimulation
+from boltzgas.initial_condition import grid_of_random_velocity_particles
 
 grid_width = 30
 radius = 0.002
@@ -17,8 +18,7 @@ velocity[:,:] = 0
 velocity[0,0] = 10.75*char_u
 velocity[0,1] = -.25*char_u
 config = HardSphereSetup(radius, char_u, position, velocity)
-#config = HardSphereSetup(radius, char_u, *grid_of_random_velocity_particles(grid_width, radius, char_u))
-gas = GasFlow(config)
+gas = HardSphereSimulation(config)
 
 m_nitrogen = 0.028 / const.N_A
 
