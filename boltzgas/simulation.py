@@ -18,27 +18,13 @@ class HardSphereSetup:
         self.n_particles = len(position[:,0])
 
 def build_kernel(delta_t, n_particles, radius):
-    with open('kernel.cl', 'r') as kernel_src:
+    with open('boltzgas/kernel.cl', 'r') as kernel_src:
         return Template(kernel_src.read()).substitute(
             delta_t     = delta_t,
             n_particles = n_particles,
             radius      = radius)
 
-def grid_of_random_velocity_particles(width, radius, u_scale):
-    np_position = np.ndarray((width**2, 2))
-    np_velocity = np.ndarray((width**2, 2))
-
-    grid = np.meshgrid(np.linspace(2*radius, 1-2*radius, width),
-                       np.linspace(2*radius, 1-2*radius, width))
-    np_position[:,0] = grid[0].flatten()
-    np_position[:,1] = grid[1].flatten()
-
-    np_velocity[:,0] = u_scale*(-0.5 + np.random.random_sample((width**2,)))
-    np_velocity[:,1] = u_scale*(-0.5 + np.random.random_sample((width**2,)))
-
-    return (np_position, np_velocity)
-
-class GasFlow:
+class HardSphereSimulation:
     def setup_cl(self):
         self.platform = cl.get_platforms()[0]
         if self.opengl:
@@ -75,6 +61,9 @@ class GasFlow:
         self.np_particle_velocity = setup.velocity.astype(np.float32)
 
         self.n_particles = setup.n_particles
+        self.radius      = setup.radius
+        self.char_u      = setup.char_u
+
         self.opengl = opengl
         self.t_scale = t_scale
 
@@ -83,7 +72,7 @@ class GasFlow:
 
         self.np_particle_velocity_norms = np.ndarray((self.n_particles, 1), dtype=np.float32)
 
-        self.kernel_src = build_kernel(self.t_scale*setup.radius/setup.char_u, self.n_particles, setup.radius)
+        self.kernel_src = build_kernel(self.t_scale*self.radius/self.char_u, self.n_particles, self.radius)
 
         self.setup_cl()
 
