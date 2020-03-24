@@ -147,3 +147,10 @@ __kernel void evolve(__global vec_t* pos_a,
 		vel_b[i] = v;
 	}
 }
+
+__kernel void get_velocity_norms(__global vec_t* velocities, __global scalar_t* norms)
+{
+	unsigned int i = get_global_id(0);
+
+	norms[i] = length(velocities[i]);
+}

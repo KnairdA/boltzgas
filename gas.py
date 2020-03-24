@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 from particles import GasFlow, HardSphereSetup, grid_of_random_velocity_particles
 
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future, ProcessPoolExecutor
 
 glutInit()
 glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
@@ -91,23 +91,28 @@ decoration_shader = Shader(
 
 texture_shader = Shader(
     fragment_src = """
-        #version 130
+        #version 430
 
-        uniform sampler2D screenTexture;
+        in vec2 tex_coord;
+
+        uniform sampler2D picture;
 
         void main() {
-            gl_FragColor = texture(screenTexture, vec2(gl_TexCoord[0].x, 1.0 - gl_TexCoord[0].y));
+            gl_FragColor = texture(picture, tex_coord);
         }""",
     vertex_src = """
-        #version 130
+        #version 430
 
-        in vec3 vertex;
+        layout (location=0) in vec2 screen_vertex;
+        layout (location=1) in vec2 texture_vertex;
+
+        out vec2 tex_coord;
 
         uniform mat4 projection;
 
         void main() {
-            gl_Position = projection * vec4(vertex, 1.0);
-            gl_TexCoord[0] = gl_MultiTexCoord0;
+            gl_Position = projection * vec4(screen_vertex, 0.0, 1.0);
+            tex_coord = texture_vertex;
         }""",
     uniform = ['projection']
 )
@@ -186,7 +191,6 @@ class ColoredBox:
         glEnd()
 
 def get_histogram(velocities):
-    velocities = np.array([np.linalg.norm(v) for v in velocities])
     maxwellian = stats.maxwell.fit(velocities)
 
     fig = plt.figure(figsize=(10,10))
@@ -206,11 +210,13 @@ def get_histogram(velocities):
 
     fig.canvas.draw()
     buf = fig.canvas.tostring_rgb()
-    ncols, nrows = fig.canvas.get_width_height()
-    texture = np.frombuffer(buf, dtype=np.uint8).reshape(nrows, ncols, 3)
-    plt.close()
+    width, height = fig.canvas.get_width_height()
+    texture = np.frombuffer(buf, dtype=np.uint8).reshape(width, height, 3)
 
-    return (texture, ncols, nrows)
+    plt.close(fig)
+
+    return (texture, height, width)
+
 
 class VelocityHistogram:
     def __init__(self, gas, origin, extend):
@@ -219,10 +225,29 @@ class VelocityHistogram:
         self.extend = extend
         self.steps = -1
 
-        self.pool = ThreadPoolExecutor(max_workers=1)
+        self.pool = ProcessPoolExecutor(max_workers=1)
         self.plotter = None
 
     def setup(self):
+        self.vertices = np.array([
+            self.origin[0]                 , self.origin[1]                 , 0., 1.,
+            self.origin[0] + self.extend[0], self.origin[1]                 , 1., 1.,
+            self.origin[0]                 , self.origin[1] + self.extend[1], 0., 0.,
+            self.origin[0] + self.extend[0], self.origin[1] + self.extend[1], 1., 0.
+        ], dtype=np.float32)
+
+        self.vao = glGenVertexArrays(1)
+        self.vbo = glGenBuffers(1)
+
+        glBindVertexArray(self.vao)
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
+        glBufferData(GL_ARRAY_BUFFER, self.vertices.tostring(), GL_STATIC_DRAW)
+
+        glEnableVertexAttribArray(0)
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4*np.dtype(np.float32).itemsize, ctypes.c_void_p(0))
+        glEnableVertexAttribArray(1)
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4*np.dtype(np.float32).itemsize, ctypes.c_void_p(2*np.dtype(np.float32).itemsize))
+
         self.texture_id = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, self.texture_id)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -232,37 +257,25 @@ class VelocityHistogram:
     def update(self):
         self.steps = self.steps + 1
 
-        if self.steps % 100 == 0 and self.plotter == None:
-            self.plotter = self.pool.submit(get_histogram, self.gas.get_velocities())
+        if self.steps % 10 == 0 and self.plotter == None:
+            self.plotter = self.pool.submit(get_histogram, self.gas.get_velocity_norms())
 
-        else:
-            if self.plotter != None:
-                if self.plotter.done():
-                    texture, width, height = self.plotter.result()
-                    self.plotter = None
-
-                    glEnable(GL_TEXTURE_2D)
-                    glBindTexture(GL_TEXTURE_2D, self.texture_id)
-                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture)
+        elif self.steps % 5 == 0:
+            if self.plotter != None and self.plotter.done():
+                texture, width, height = self.plotter.result()
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture)
+                self.plotter = None
 
 
     def display(self, uniform):
         glEnable(GL_TEXTURE_2D)
+        glBindVertexArray(self.vao);
         glBindTexture(GL_TEXTURE_2D, self.texture_id)
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+        glBindVertexArray(0)
 
-        glBegin(GL_TRIANGLE_STRIP)
-        glTexCoord(0.,0.)
-        glVertex(self.origin[0],                  self.origin[1]                 , 0.)
-        glTexCoord(1.,0.)
-        glVertex(self.origin[0] + self.extend[0], self.origin[1]                 , 0.)
-        glTexCoord(0.,1.)
-        glVertex(self.origin[0]                 , self.origin[1] + self.extend[1], 0.)
-        glTexCoord(1.,1.)
-        glVertex(self.origin[0] + self.extend[1], self.origin[1] + self.extend[1], 0.)
-        glEnd()
-
-grid_width = 30
-radius = 0.003
+grid_width = 32
+radius = 0.004
 char_u = 1120
 
 position, velocity = grid_of_random_velocity_particles(grid_width, radius, char_u)
@@ -271,20 +284,22 @@ velocity[0,0] = 10*char_u
 velocity[0,1] = 4*char_u
 
 config = HardSphereSetup(radius, char_u, position, velocity)
-gas = GasFlow(config, opengl = True, t_scale = 1.0)
+gas = GasFlow(config, opengl = True, t_scale = 0.1)
 
-tracer = Tracer(gas, 5)
+tracer = Tracer(gas, 4)
 histogram = VelocityHistogram(gas, [1.1,0], [1,1])
 histogram.setup()
-view = View(gas, [ ColoredBox([0,0], [1,1], (1,1,1)) ], [ histogram ])
+view = View(gas, [ ColoredBox([0,0], [1,1], (1,1,1)), tracer ], [ histogram ])
+
+running = False
 
 def on_display():
-    for i in range(0,2):
-        gas.evolve()
+    if running:
+        for i in range(0,5):
+            gas.evolve()
 
-    gas.queue.finish()
-
-    histogram.update()
+        tracer.update()
+        histogram.update()
 
     view.display()
 
@@ -295,8 +310,13 @@ def on_timer(t):
     glutTimerFunc(t, on_timer, t)
     glutPostRedisplay()
 
+def on_keyboard(key, x, y):
+    global running
+    running = not running
+
 glutDisplayFunc(on_display)
 glutReshapeFunc(on_reshape)
 glutTimerFunc(10, on_timer, 10)
+glutKeyboardFunc(on_keyboard)
 
 glutMainLoop()

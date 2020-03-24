@@ -68,6 +68,7 @@ class GasFlow:
             self.cl_particle_position_b = cl.Buffer(self.context, mf.COPY_HOST_PTR, hostbuf=self.np_particle_position)
 
         self.cl_last_collide = cl.Buffer(self.context, mf.COPY_HOST_PTR, hostbuf=self.np_last_collide)
+        self.cl_particle_velocity_norms = cl.Buffer(self.context, mf.COPY_HOST_PTR, hostbuf=self.np_particle_velocity_norms)
 
     def __init__(self, setup, opengl = False, t_scale = 1.0):
         self.np_particle_position = setup.position.astype(np.float32)
@@ -79,6 +80,8 @@ class GasFlow:
 
         self.np_last_collide = np.ndarray((self.n_particles, 1), dtype=np.uint32)
         self.np_last_collide[:,0] = self.n_particles
+
+        self.np_particle_velocity_norms = np.ndarray((self.n_particles, 1), dtype=np.float32)
 
         self.kernel_src = build_kernel(self.t_scale*setup.radius/setup.char_u, self.n_particles, setup.radius)
 
@@ -119,6 +122,16 @@ class GasFlow:
         else:
             cl.enqueue_copy(self.queue, self.np_particle_velocity, self.cl_particle_velocity_a).wait()
             return self.np_particle_velocity
+
+    def get_velocity_norms(self):
+        if self.tick:
+            self.program.get_velocity_norms(self.queue, (self.n_particles,), None, self.cl_particle_velocity_b, self.cl_particle_velocity_norms)
+            cl.enqueue_copy(self.queue, self.np_particle_velocity_norms, self.cl_particle_velocity_norms).wait()
+            return self.np_particle_velocity_norms
+        else:
+            self.program.get_velocity_norms(self.queue, (self.n_particles,), None, self.cl_particle_velocity_a, self.cl_particle_velocity_norms)
+            cl.enqueue_copy(self.queue, self.np_particle_velocity_norms, self.cl_particle_velocity_norms).wait()
+            return self.np_particle_velocity_norms
 
     def get_positions(self):
         if self.tick:
