@@ -55,12 +55,20 @@ particle_shader = Shader(
         out vec3 color;
 
         uniform mat4 projection;
+        uniform vec3 face_color;
+        uniform vec3 trace_color;
+        uniform uint trace_id;
 
         void main() {
             gl_Position = projection * vec4(particles, 0., 1.);
-            color = vec3(0.0);
+
+            if (gl_VertexID == trace_id) {
+                color = trace_color;
+            } else {
+                color = face_color;
+            }
         }""",
-    uniform = ['projection']
+    uniform = ['projection', 'face_color', 'trace_color', 'trace_id']
 )
 
 decoration_shader = Shader(
@@ -138,7 +146,7 @@ class View:
         self.projection = np.matmul(translation, projection)
 
     def display(self):
-        glClearColor(0.4,0.4,0.4,1.)
+        glClearColor(0.,0.,0.,1.)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         decoration_shader.use()
@@ -153,6 +161,9 @@ class View:
 
         particle_shader.use()
         glUniformMatrix4fv(particle_shader.uniform['projection'], 1, False, np.asfortranarray(self.projection))
+        glUniform3f(particle_shader.uniform['face_color'],  1., 1., 1.)
+        glUniform3f(particle_shader.uniform['trace_color'], 1., 0., 0.)
+        glUniform1ui(particle_shader.uniform['trace_id'], 4)
         glEnable(GL_POINT_SPRITE)
         glPointSize(2*radius*self.pixels_per_unit)
         self.gas.gl_draw_particles()
@@ -195,7 +206,10 @@ class ColoredBox:
 def get_histogram(velocities):
     maxwellian = stats.maxwell.fit(velocities)
 
+    plt.style.use('dark_background')
+
     fig = plt.figure(figsize=(10,10))
+    ax = fig.add_axes([0.1, 0.05, 0.88, 0.93])
 
     plt.ylim(0, 0.003)
     plt.ylabel('Probability')
@@ -316,7 +330,7 @@ gas = GasFlow(config, opengl = True, t_scale = 1.0)
 tracer = Tracer(gas, 4)
 histogram = VelocityHistogram(gas, [1.1,0], [1,1])
 histogram.setup()
-view = View(gas, [ ColoredBox([0,0], [1,1], (1,1,1)), tracer ], [ histogram ])
+view = View(gas, [ ColoredBox([0,0], [1,1], (0.2,0.2,0.2)), tracer ], [ histogram ])
 
 active = False
 
