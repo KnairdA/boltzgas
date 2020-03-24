@@ -95,10 +95,12 @@ texture_shader = Shader(
 
         in vec2 tex_coord;
 
-        uniform sampler2D picture;
+        uniform sampler2D picture[2];
+
+        uniform float mixing;
 
         void main() {
-            gl_FragColor = texture(picture, tex_coord);
+            gl_FragColor = mix(texture(picture[0], tex_coord), texture(picture[1], tex_coord), mixing);
         }""",
     vertex_src = """
         #version 430
@@ -114,7 +116,7 @@ texture_shader = Shader(
             gl_Position = projection * vec4(screen_vertex, 0.0, 1.0);
             tex_coord = texture_vertex;
         }""",
-    uniform = ['projection']
+    uniform = ['picture','projection','mixing']
 )
 
 class View:
@@ -228,6 +230,9 @@ class VelocityHistogram:
         self.pool = ProcessPoolExecutor(max_workers=1)
         self.plotter = None
 
+        self.tick = False
+        self.mixing = 0.0
+
     def setup(self):
         self.vertices = np.array([
             self.origin[0]                 , self.origin[1]                 , 0., 1.,
@@ -248,29 +253,52 @@ class VelocityHistogram:
         glEnableVertexAttribArray(1)
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4*np.dtype(np.float32).itemsize, ctypes.c_void_p(2*np.dtype(np.float32).itemsize))
 
-        self.texture_id = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, self.texture_id)
+        self.texture_id = glGenTextures(2)
+        print(self.texture_id)
+
+        glBindTexture(GL_TEXTURE_2D, self.texture_id[0])
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glEnable(GL_TEXTURE_2D)
+
+        glBindTexture(GL_TEXTURE_2D, self.texture_id[1])
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     def update(self):
         self.steps = self.steps + 1
 
-        if self.steps % 10 == 0 and self.plotter == None:
+        if self.steps % 100 == 0 and self.plotter == None:
             self.plotter = self.pool.submit(get_histogram, self.gas.get_velocity_norms())
 
-        elif self.steps % 5 == 0:
+        else:
             if self.plotter != None and self.plotter.done():
                 texture, width, height = self.plotter.result()
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture)
+                if self.tick:
+                    glBindTexture(GL_TEXTURE_2D, self.texture_id[0])
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture)
+                    self.tick = False
+                    self.mixing = 1.0
+
+                else:
+                    glBindTexture(GL_TEXTURE_2D, self.texture_id[1])
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture)
+                    self.tick = True
+                    self.mixing = 0.0
+
                 self.plotter = None
 
 
     def display(self, uniform):
-        glEnable(GL_TEXTURE_2D)
+        if self.tick:
+            self.mixing = min(self.mixing+0.1, 1.0);
+        else:
+            self.mixing = max(self.mixing-0.1, 0.0);
+
+        glBindTextures(self.texture_id[0], 2, self.texture_id)
+        glUniform1iv(uniform['picture'], len(self.texture_id), self.texture_id)
+        glUniform1f(uniform['mixing'], self.mixing)
+
         glBindVertexArray(self.vao);
-        glBindTexture(GL_TEXTURE_2D, self.texture_id)
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
         glBindVertexArray(0)
 
@@ -284,7 +312,7 @@ velocity[0,0] = 10*char_u
 velocity[0,1] = 4*char_u
 
 config = HardSphereSetup(radius, char_u, position, velocity)
-gas = GasFlow(config, opengl = True, t_scale = 0.1)
+gas = GasFlow(config, opengl = True, t_scale = 1.0)
 
 tracer = Tracer(gas, 4)
 histogram = VelocityHistogram(gas, [1.1,0], [1,1])
@@ -314,9 +342,13 @@ def on_keyboard(key, x, y):
     global running
     running = not running
 
+def on_close():
+    histogram.pool.shutdown(wait=True)
+
 glutDisplayFunc(on_display)
 glutReshapeFunc(on_reshape)
 glutTimerFunc(10, on_timer, 10)
 glutKeyboardFunc(on_keyboard)
+glutCloseFunc(on_close)
 
 glutMainLoop()
