@@ -6,6 +6,9 @@ class Tracer:
         self.iParticle = iParticle
         self.trace = [ ]
 
+    def setup(self):
+        return
+
     def update(self):
         position = self.gas.get_positions()[self.iParticle]
         self.trace.append((position[0], position[1]))
@@ -17,4 +20,3 @@ class Tracer:
         for v in self.trace:
             glVertex(*v, 0.)
         glEnd()
-

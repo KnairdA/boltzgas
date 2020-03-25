@@ -62,6 +62,7 @@ class VelocityHistogram:
             self.origin[0] + self.extend[0], self.origin[1] + self.extend[1], 1., 0.
         ], dtype=np.float32)
 
+    def setup(self):
         self.vao = glGenVertexArrays(1)
         self.vbo = glGenBuffers(1)
 

@@ -19,6 +19,7 @@ velocity[0,0] = 10.75*char_u
 velocity[0,1] = -.25*char_u
 config = HardSphereSetup(radius, char_u, position, velocity)
 gas = HardSphereSimulation(config)
+gas.setup()
 
 m_nitrogen = 0.028 / const.N_A
 
