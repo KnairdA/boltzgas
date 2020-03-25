@@ -89,7 +89,7 @@ class HardSphereSimulation:
             self.tick = True
             kernelargs = (self.cl_particle_position_b, self.cl_particle_velocity_b, self.cl_particle_position_a, self.cl_particle_velocity_a, self.cl_last_collide)
 
-        self.program.evolve(self.queue, (self.n_particles,), None, *(kernelargs))
+        self.program.evolve(self.queue, (self.n_particles,), None, *(kernelargs)).wait()
 
     def gl_draw_particles(self):
         gl.glEnableClientState(gl.GL_VERTEX_ARRAY)

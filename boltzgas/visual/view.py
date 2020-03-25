@@ -146,7 +146,7 @@ class View:
         glUniformMatrix4fv(self.particle_shader.uniform['projection'], 1, False, np.asfortranarray(self.projection))
         glUniform3f(self.particle_shader.uniform['face_color'],  1., 1., 1.)
         glUniform3f(self.particle_shader.uniform['trace_color'], 1., 0., 0.)
-        glUniform1ui(self.particle_shader.uniform['trace_id'], 4)
+        glUniform1ui(self.particle_shader.uniform['trace_id'], -1)
         glEnable(GL_POINT_SPRITE)
         glPointSize(2*self.gas.radius*self.pixels_per_unit)
         self.gas.gl_draw_particles()

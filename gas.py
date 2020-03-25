@@ -7,59 +7,102 @@ from boltzgas import HardSphereSetup, HardSphereSimulation
 from boltzgas.initial_condition import grid_of_random_velocity_particles
 from boltzgas.visual import View, VelocityHistogram, Tracer, ColoredBox
 
-glutInit()
-glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
-glutInitWindowPosition(0, 0)
-glutCreateWindow("BoltzGas")
-
-grid_width = 32
-radius = 0.004
+grid_width = 40
+radius = 0.002
 char_u = 1120
 
-position, velocity = grid_of_random_velocity_particles(grid_width, radius, char_u)
-velocity[:,:] = 0
-velocity[0,0] = 10*char_u
-velocity[0,1] = 4*char_u
+class SimulationController:
+    def __init__(self, gas, instruments):
+        self.running = False
+        self.gas = gas
+        self.instruments = instruments
 
-config = HardSphereSetup(radius, char_u, position, velocity)
-gas = HardSphereSimulation(config, opengl = True, t_scale = 0.1)
+    def isRunning(self):
+        return self.running
 
-tracer = Tracer(gas, 4)
-histogram = VelocityHistogram(gas, [1.1,0], [1,1])
-histogram.setup()
-view = View(gas, [ ColoredBox([0,0], [1,1], (0.2,0.2,0.2)), tracer ], [ histogram ])
+    def run(self):
+        self.running = True
 
-active = False
+    def pause(self):
+        self.running = False
 
-def on_display():
-    if active:
-        for i in range(0,5):
-            gas.evolve()
+    def evolve(self):
+        if self.running:
+            for i in range(0,5):
+                self.gas.evolve()
 
-        tracer.update()
-        histogram.update()
+            for instrument in self.instruments:
+                instrument.update()
 
-    view.display()
+    def shutdown(self):
+        self.pause()
 
-def on_reshape(width, height):
-    view.reshape(width, height)
+        for instrument in self.instruments:
+            try:
+                instrument.shutdown()
+            except AttributeError:
+                return # Doesn't matter, shutdown is optional
 
-def on_timer(t):
-    glutTimerFunc(t, on_timer, t)
-    glutPostRedisplay()
 
-def on_keyboard(key, x, y):
-    global active
-    active = not active
+def make_display_handler(controller, view):
+    def on_display():
+        controller.evolve()
+        view.display()
 
-def on_close():
-    histogram.pool.shutdown()
+    return on_display
 
-glutDisplayFunc(on_display)
-glutReshapeFunc(on_reshape)
-glutTimerFunc(10, on_timer, 10)
-glutKeyboardFunc(on_keyboard)
-glutCloseFunc(on_close)
+def make_reshape_handler(view):
+    def on_reshape(width, height):
+        view.reshape(width, height)
+
+    return on_reshape
+
+def make_timer():
+    def on_timer(t):
+        glutTimerFunc(t, on_timer, t)
+        glutPostRedisplay()
+
+    return on_timer
+
+def make_keyboard_handler(controller):
+    def on_keyboard(key, x, y):
+        if controller.isRunning():
+            controller.pause()
+        else:
+            controller.run()
+
+    return on_keyboard
+
+def make_close_handler(controller):
+    def on_close():
+        controller.shutdown()
+
+    return on_close
 
 if __name__ == "__main__":
+    glutInit()
+    glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
+    glutInitWindowPosition(0, 0)
+    glutCreateWindow("BoltzGas")
+
+    position, velocity = grid_of_random_velocity_particles(grid_width, radius, char_u)
+    velocity[:,:] = 0
+    velocity[0,0] = 10*char_u
+    velocity[0,1] = 4*char_u
+
+    config = HardSphereSetup(radius, char_u, position, velocity)
+    gas = HardSphereSimulation(config, opengl = True, t_scale = 0.5)
+
+    tracer = Tracer(gas, 4)
+    histogram = VelocityHistogram(gas, [1.1,0], [1,1])
+    view = View(gas, [ ColoredBox([0,0], [1,1], (0.2,0.2,0.2)) ], [ histogram ])
+
+    controller = SimulationController(gas, [ histogram ])
+
+    glutDisplayFunc(make_display_handler(controller, view))
+    glutReshapeFunc(make_reshape_handler(view))
+    glutTimerFunc(20, make_timer(), 20)
+    glutKeyboardFunc(make_keyboard_handler(controller))
+    glutCloseFunc(make_close_handler(controller))
+
     glutMainLoop()

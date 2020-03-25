@@ -19,7 +19,7 @@ def get_histogram(velocities, char_u):
     fig = plt.figure(figsize=(8,8))
     ax = fig.add_axes([0.1, 0.06, 0.88, 0.92])
 
-    plt.ylim(0, 0.003)
+    plt.ylim(0, 0.004)
     plt.ylabel('Probability')
 
     plt.xlim(0, 1.2*char_u)
@@ -55,7 +55,6 @@ class VelocityHistogram:
         self.tick = False
         self.mixing = 0.0
 
-    def setup(self):
         self.vertices = np.array([
             self.origin[0]                 , self.origin[1]                 , 0., 1.,
             self.origin[0] + self.extend[0], self.origin[1]                 , 1., 1.,
@@ -85,6 +84,9 @@ class VelocityHistogram:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+    def shutdown(self):
+        self.pool.shutdown()
+
     def update(self):
         self.steps = self.steps + 1
 
@@ -111,9 +113,9 @@ class VelocityHistogram:
 
     def display(self, uniform):
         if self.tick:
-            self.mixing = min(self.mixing+0.1, 1.0);
+            self.mixing = min(self.mixing+0.05, 1.0);
         else:
-            self.mixing = max(self.mixing-0.1, 0.0);
+            self.mixing = max(self.mixing-0.05, 0.0);
 
         glBindTextures(self.texture_id[0], 2, self.texture_id)
         glUniform1iv(uniform['picture'], len(self.texture_id), self.texture_id)
@@ -122,4 +124,3 @@ class VelocityHistogram:
         glBindVertexArray(self.vao);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
         glBindVertexArray(0)
-
