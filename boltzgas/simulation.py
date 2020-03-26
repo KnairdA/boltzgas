@@ -95,10 +95,10 @@ class HardSphereSimulation:
 
         if self.tick:
             self.gl_particle_position_b.bind()
-            gl.glVertexPointer(2, gl.GL_FLOAT, 0, self.gl_particle_position_b)
+            gl.glVertexPointer(4, gl.GL_FLOAT, 0, self.gl_particle_position_b)
         else:
             self.gl_particle_position_a.bind()
-            gl.glVertexPointer(2, gl.GL_FLOAT, 0, self.gl_particle_position_a)
+            gl.glVertexPointer(4, gl.GL_FLOAT, 0, self.gl_particle_position_a)
 
         gl.glDrawArrays(gl.GL_POINTS, 0, self.n_particles)
         gl.glDisableClientState(gl.GL_VERTEX_ARRAY)
