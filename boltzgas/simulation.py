@@ -17,18 +17,16 @@ class HardSphereSetup:
         self.velocity = velocity
         self.n_particles = len(position[:,0])
 
-def build_kernel(delta_t, n_particles, radius):
+def build_kernel(dimension, delta_t, n_particles, radius):
     with open('boltzgas/kernel.cl', 'r') as kernel_src:
         return Template(kernel_src.read()).substitute(
             delta_t     = delta_t,
             n_particles = n_particles,
-            radius      = radius)
+            radius      = radius,
+            dimension   = dimension)
 
 class HardSphereSimulation:
     def __init__(self, setup, opengl = False, t_scale = 1.0):
-        self.np_particle_position = setup.position.astype(np.float32)
-        self.np_particle_velocity = setup.velocity.astype(np.float32)
-
         self.n_particles = setup.n_particles
         self.radius      = setup.radius
         self.char_u      = setup.char_u
@@ -36,12 +34,25 @@ class HardSphereSimulation:
         self.opengl = opengl
         self.t_scale = t_scale
 
+        self.dimension = len(setup.position[0,:])
+
+        if self.dimension == 2:
+            self.np_particle_position = setup.position.astype(np.float32)
+            self.np_particle_velocity = setup.velocity.astype(np.float32)
+        elif self.dimension == 3:
+            self.np_particle_position = np.ndarray((self.n_particles, 4), dtype=np.float32)
+            self.np_particle_position[:,0:3] = setup.position
+            self.np_particle_velocity = np.ndarray((self.n_particles, 4), dtype=np.float32)
+            self.np_particle_velocity[:,0:3] = setup.velocity
+        else:
+            raise 'Dimension invalid'
+
         self.np_last_collide = np.ndarray((self.n_particles, 1), dtype=np.uint32)
         self.np_last_collide[:,0] = self.n_particles
 
         self.np_particle_velocity_norms = np.ndarray((self.n_particles, 1), dtype=np.float32)
 
-        self.kernel_src = build_kernel(self.t_scale*self.radius/self.char_u, self.n_particles, self.radius)
+        self.kernel_src = build_kernel(self.dimension, self.t_scale*self.radius/self.char_u, self.n_particles, self.radius)
 
         self.tick = True
 
@@ -95,10 +106,10 @@ class HardSphereSimulation:
 
         if self.tick:
             self.gl_particle_position_b.bind()
-            gl.glVertexPointer(4, gl.GL_FLOAT, 0, self.gl_particle_position_b)
+            gl.glVertexPointer(len(self.np_particle_position[0,:]), gl.GL_FLOAT, 0, self.gl_particle_position_b)
         else:
             self.gl_particle_position_a.bind()
-            gl.glVertexPointer(4, gl.GL_FLOAT, 0, self.gl_particle_position_a)
+            gl.glVertexPointer(len(self.np_particle_position[0,:]), gl.GL_FLOAT, 0, self.gl_particle_position_a)
 
         gl.glDrawArrays(gl.GL_POINTS, 0, self.n_particles)
         gl.glDisableClientState(gl.GL_VERTEX_ARRAY)

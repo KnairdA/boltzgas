@@ -125,8 +125,8 @@ class View:
         self.particle_shader   = Shader(*particle_shader)
         self.decoration_shader = Shader(*decoration_shader)
 
-        self.camera_projection = Projection(distance = 6)
-        self.camera_rotation = Rotation([-1/2, -1/2, -1/2])
+        self.camera_projection = Projection(distance = 5)
+        self.camera_rotation = Rotation([-1/2, -1/2, -1/2], np.pi/2, 0)
         self.camera_pos = np.matmul([0,-self.camera_projection.distance,0,1], self.camera_rotation.get_inverse())
 
         self.mouse_monitors = [

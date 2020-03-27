@@ -2,7 +2,9 @@
 #define N_PARTICLES $n_particles
 #define DELTA_T     $delta_t
 
+#if $dimension == 3
 #define ENABLE_3D
+#endif
 
 typedef float  scalar_t;
 

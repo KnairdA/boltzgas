@@ -42,27 +42,27 @@ class Projection:
         return self.matrix
 
 class Rotation:
-    def __init__(self, shift, x = np.pi, z = np.pi):
+    def __init__(self, shift, x = np.pi, y = np.pi):
         self.matrix = matrix44.create_from_translation(shift),
         self.rotation_x = quaternion.Quaternion()
-        self.update(x,z)
+        self.update(x,y)
 
-    def shift(self, x, z):
+    def shift(self, x, y):
         self.matrix = np.matmul(
             self.matrix,
-            matrix44.create_from_translation([x,0,z])
+            matrix44.create_from_translation([x,y,0])
         )
         self.inverse_matrix = np.linalg.inv(self.matrix)
 
-    def update(self, x, z):
+    def update(self, x, y):
         rotation_x = quaternion.Quaternion(quaternion.create_from_eulers([x,0,0]))
-        rotation_z = self.rotation_x.conjugate.cross(
-                quaternion.Quaternion(quaternion.create_from_eulers([0,0,z])))
+        rotation_y = self.rotation_x.conjugate.cross(
+                quaternion.Quaternion(quaternion.create_from_eulers([0,y,0])))
         self.rotation_x = self.rotation_x.cross(rotation_x)
 
         self.matrix = np.matmul(
             self.matrix,
-            matrix44.create_from_quaternion(rotation_z.cross(self.rotation_x))
+            matrix44.create_from_quaternion(rotation_y.cross(self.rotation_x))
         )
         self.inverse_matrix = np.linalg.inv(self.matrix)
 
