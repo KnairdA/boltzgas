@@ -11,7 +11,7 @@ char_u = 1120
 position, velocity = grid_of_random_velocity_particles(grid_width, radius, char_u)
 
 config = HardSphereSetup(radius, char_u, position, velocity)
-gas = HardSphereSimulation(config, opengl = True, t_scale=1)
+gas = HardSphereSimulation(config, opengl = True, t_scale=0.5)
 
 #tracer = Tracer(gas, int((grid_width**2)/2+grid_width/2))
 histogram = VelocityHistogram(gas, [1.1,0], [1,1])

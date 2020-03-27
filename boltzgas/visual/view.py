@@ -11,12 +11,21 @@ particle_shader = (
     """
         #version 430
 
-        in vec3 color;
+        in vec3 particle_pos;
+
+        uniform vec4 camera_pos;
 
         void main(){
             if (length(gl_PointCoord - vec2(0.5)) > 0.5) {
                 discard;
             }
+
+            vec3 n = vec3(gl_PointCoord - vec2(0.5), 0.);
+            n.z = -sqrt(1.0 - length(n));
+            n = normalize(n);
+
+            vec3 dir = normalize(camera_pos.xyz - particle_pos);
+            vec3 color = vec3(1.,1.,1.) * dot(dir, n);
 
             gl_FragColor = vec4(color.xyz, 0.0);
         }
@@ -27,6 +36,7 @@ particle_shader = (
         layout (location=0) in vec4 particles;
 
         out vec3 color;
+        out vec3 particle_pos;
 
         uniform mat4 projection;
         uniform mat4 rotation;
@@ -34,21 +44,14 @@ particle_shader = (
         uniform vec3 face_color;
         uniform vec3 trace_color;
         uniform uint trace_id;
+        uniform vec4 camera_pos;
 
         void main() {
             gl_Position = projection * rotation * vec4(particles.xyz, 1.);
-
-            if (particles.x < 0.0 || particles.x > 1.0 ||
-                particles.y < 0.0 || particles.y > 1.0 ||
-                particles.z < 0.0 || particles.z > 1.0
-            ) {
-                color = trace_color;
-            } else {
-                color = face_color;
-            }
+            particle_pos = gl_Position.xyz;
         }
     """,
-    ['projection', 'rotation', 'face_color', 'trace_color', 'trace_id']
+    ['projection', 'rotation', 'face_color', 'trace_color', 'trace_id', 'camera_pos']
 )
 
 decoration_shader = (
@@ -184,8 +187,9 @@ class View:
         self.particle_shader   = Shader(*particle_shader)
         self.decoration_shader = Shader(*decoration_shader)
 
-        self.projection3d = Projection(distance = 7)
-        self.rotation3d = Rotation([-1/2, -1/2, -1/2], 5*np.pi/4, np.pi/4)
+        self.projection3d = Projection(distance = 6)
+        self.rotation3d = Rotation([-1, -1, -1/2], 5*np.pi/4, np.pi/4)
+        self.camera_pos = np.matmul([0,self.projection3d.distance,0,1], self.rotation3d.get_inverse())
 
     def reshape(self, width, height):
         glViewport(0,0,width,height)
@@ -224,6 +228,7 @@ class View:
         glUniform3f(self.particle_shader.uniform['face_color'],  1., 1., 1.)
         glUniform3f(self.particle_shader.uniform['trace_color'], 1., 0., 0.)
         glUniform1ui(self.particle_shader.uniform['trace_id'], -1)
+        glUniform4fv(self.particle_shader.uniform['camera_pos'], 1, self.camera_pos)
 
         glEnable(GL_POINT_SPRITE)
         glPointSize(2*self.gas.radius*self.pixels_per_unit)
