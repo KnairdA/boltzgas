@@ -64,8 +64,10 @@ def make_keyboard_handler(controller, view):
                 controller.pause()
             else:
                 controller.run()
-        if key == b'h':
-            view.show_histogram = not view.show_histogram
+        if key == b'1':
+            view.show_decorations = not view.show_decorations
+        if key == b'2':
+            view.show_windows = not view.show_windows
 
     return on_keyboard
 
@@ -75,7 +77,7 @@ def make_close_handler(controller):
 
     return on_close
 
-def simulate(config, gas, instruments, decorations, windows, updates_per_frame = 5):
+def simulate(config, gas, instruments, updates_per_frame = 5):
     glutInit()
     glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
     glutInitWindowPosition(0, 0)
@@ -85,7 +87,7 @@ def simulate(config, gas, instruments, decorations, windows, updates_per_frame =
     for instrument in instruments:
         instrument.setup()
 
-    view = View(gas, decorations, windows)
+    view = View(gas, instruments)
     controller = SimulationController(gas, instruments, updates_per_frame)
 
     glutDisplayFunc(make_display_handler(controller, view))

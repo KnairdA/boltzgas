@@ -19,8 +19,6 @@ gas = HardSphereSimulation(config, opengl = True, t_scale = 0.5)
 
 histogram = VelocityHistogram(gas, [1.1,0], [1,1])
 
-decorations = [ WireBox(0,1,0,1,0,1) ]
-instruments = [ histogram ]
-windows = [ histogram ]
+instruments = [ WireBox(0,1,0,1,0,1), histogram ]
 
-boltzgas.visualizer.simulate(config, gas, instruments, decorations, windows)
+boltzgas.visualizer.simulate(config, gas, instruments)

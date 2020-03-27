@@ -6,7 +6,13 @@ class ColoredBox:
         self.extend = extend
         self.color = color
 
-    def display(self, uniform):
+    def setup(self):
+        pass
+
+    def update(self):
+        pass
+
+    def display_decoration(self, uniform):
         glUniform3f(uniform['face_color'], *self.color)
         glBegin(GL_TRIANGLE_STRIP)
         glVertex(self.origin[0],                  self.origin[1]                 , 0.)
@@ -14,6 +20,9 @@ class ColoredBox:
         glVertex(self.origin[0]                 , self.origin[1] + self.extend[1], 0.)
         glVertex(self.origin[0] + self.extend[1], self.origin[1] + self.extend[1], 0.)
         glEnd()
+
+    def display_window(self, uniform):
+        pass
 
 class WireBox:
     def __init__(self, x0, x1, y0, y1, z0, z1):
@@ -24,7 +33,13 @@ class WireBox:
         self.z0 = z0
         self.z1 = z1
 
-    def display(self, uniform):
+    def setup(self):
+        pass
+
+    def update(self):
+        pass
+
+    def display_decoration(self, uniform):
         glBegin(GL_LINE_STRIP)
         glVertex(self.x0, self.y0, self.z0)
         glVertex(self.x0, self.y1, self.z0)
@@ -68,5 +83,5 @@ class WireBox:
         glVertex(self.x0,self.y1,self.z0)
         glEnd()
 
-
-
+    def display_window(self, uniform):
+        pass

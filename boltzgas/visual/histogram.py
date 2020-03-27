@@ -111,8 +111,10 @@ class VelocityHistogram:
 
                 self.plotter = None
 
+    def display_decoration(self, uniform):
+        pass
 
-    def display(self, uniform):
+    def display_window(self, uniform):
         if self.tick:
             self.mixing = min(self.mixing+0.05, 1.0);
         else:

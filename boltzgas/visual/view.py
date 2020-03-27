@@ -52,7 +52,7 @@ particle_shader = (
             particle_pos = gl_Position.xyz;
         }
     """,
-    ['projection', 'rotation', 'face_color', 'trace_color', 'trace_id', 'camera_pos']
+    ['projection', 'rotation', 'camera_pos']
 )
 
 decoration_shader = (
@@ -60,7 +60,7 @@ decoration_shader = (
         #version 430
 
         void main(){
-            gl_FragColor = vec4(1.,1.,1., 1.0);
+            gl_FragColor = vec4(1.);
         }
     """,
     """
@@ -117,10 +117,9 @@ texture_shader = (
 
 
 class View:
-    def __init__(self, gas, decorations, windows):
+    def __init__(self, gas, instruments):
         self.gas = gas
-        self.decorations = decorations
-        self.windows = windows
+        self.instruments = instruments
 
         self.texture_shader    = Shader(*texture_shader)
         self.particle_shader   = Shader(*particle_shader)
@@ -136,8 +135,8 @@ class View:
             MouseScrollMonitor(lambda zoom: self.camera_projection.update_distance(0.1*zoom))
         ]
 
-        self.show_histogram = False
-
+        self.show_windows = False
+        self.show_decorations = True
 
     def reshape(self, width, height):
         glViewport(0,0,width,height)
@@ -169,10 +168,6 @@ class View:
         self.particle_shader.use()
         glUniformMatrix4fv(self.particle_shader.uniform['projection'], 1, False, np.ascontiguousarray(self.camera_projection.get()))
         glUniformMatrix4fv(self.particle_shader.uniform['rotation'],   1, False, np.ascontiguousarray(self.camera_rotation.get()))
-
-        glUniform3f(self.particle_shader.uniform['face_color'],  1., 1., 1.)
-        glUniform3f(self.particle_shader.uniform['trace_color'], 1., 0., 0.)
-        glUniform1ui(self.particle_shader.uniform['trace_id'], -1)
         glUniform4fv(self.particle_shader.uniform['camera_pos'], 1, self.camera_pos)
 
         glEnable(GL_POINT_SPRITE)
@@ -180,17 +175,18 @@ class View:
         self.gas.gl_draw_particles()
         glBindVertexArray(0)
 
-        self.decoration_shader.use()
-        glUniformMatrix4fv(self.decoration_shader.uniform['projection'], 1, False, np.ascontiguousarray(self.camera_projection.get()))
-        glUniformMatrix4fv(self.decoration_shader.uniform['rotation'],   1, False, np.ascontiguousarray(self.camera_rotation.get()))
-        glLineWidth(2)
-        for decoration in self.decorations:
-            decoration.display(self.decoration_shader.uniform)
+        if self.show_decorations:
+            self.decoration_shader.use()
+            glUniformMatrix4fv(self.decoration_shader.uniform['projection'], 1, False, np.ascontiguousarray(self.camera_projection.get()))
+            glUniformMatrix4fv(self.decoration_shader.uniform['rotation'],   1, False, np.ascontiguousarray(self.camera_rotation.get()))
+            glLineWidth(2)
+            for instrument in self.instruments:
+                instrument.display_decoration(self.decoration_shader.uniform)
 
-        if self.show_histogram:
+        if self.show_windows:
             self.texture_shader.use()
             glUniformMatrix4fv(self.texture_shader.uniform['projection'], 1, False, np.asfortranarray(self.projection))
-            for window in self.windows:
-                window.display(self.texture_shader.uniform)
+            for instrument in self.instruments:
+                instrument.display_window(self.texture_shader.uniform)
 
         glutSwapBuffers()
