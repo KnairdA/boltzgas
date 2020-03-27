@@ -57,12 +57,15 @@ def make_timer():
 
     return on_timer
 
-def make_keyboard_handler(controller):
+def make_keyboard_handler(controller, view):
     def on_keyboard(key, x, y):
-        if controller.isRunning():
-            controller.pause()
-        else:
-            controller.run()
+        if key == b' ':
+            if controller.isRunning():
+                controller.pause()
+            else:
+                controller.run()
+        if key == b'h':
+            view.show_histogram = not view.show_histogram
 
     return on_keyboard
 
@@ -88,7 +91,9 @@ def simulate(config, gas, instruments, decorations, windows, updates_per_frame =
     glutDisplayFunc(make_display_handler(controller, view))
     glutReshapeFunc(make_reshape_handler(view))
     glutTimerFunc(20, make_timer(), 20)
-    glutKeyboardFunc(make_keyboard_handler(controller))
+    glutKeyboardFunc(make_keyboard_handler(controller, view))
     glutCloseFunc(make_close_handler(controller))
+    glutMouseFunc(lambda *args: list(map(lambda m: m.on_mouse(*args), view.mouse_monitors)))
+    glutMotionFunc(lambda *args: list(map(lambda m: m.on_mouse_move(*args), view.mouse_monitors)))
 
     glutMainLoop()
