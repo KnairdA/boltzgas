@@ -9,8 +9,10 @@ pkgs.stdenvNoCC.mkDerivation rec {
       packageOverrides = self: super: {
         pyopencl = super.pyopencl.overridePythonAttrs(old: rec {
           buildInputs = with pkgs; [
-            opencl-headers ocl-icd python37Packages.pybind11
-            libGLU_combined
+            opencl-headers ocl-icd
+            python38Packages.pybind11
+            libGL
+            libGLU
           ];
         # Enable OpenGL integration and fix build
           preBuild = ''
